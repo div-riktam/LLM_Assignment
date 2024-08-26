@@ -11,9 +11,11 @@ const App = () => {
   const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchQuestions = async () => {
     try {
+      setIsLoading(true);
       const response = await axios.post('http://localhost:4000/interview/questions', {
         jobTitle,
         skills,
@@ -24,9 +26,16 @@ const App = () => {
           'Content-Type': 'application/json'
         }
       });
+      setIsLoading(false);
 
       const result = await response.data;
-      setQuestions(result);
+
+      console.log('result', result);
+      setQuestions(result.questions.map(q => {
+        q.type = Number(q.type);
+        return q;
+      }));
+
       setCurrentIndex(0); // Reset to the first question
       setAnswers({}); // Reset previous answers
     } catch (error) {
@@ -50,6 +59,7 @@ const App = () => {
   };
 
   const renderQuestion = (question, index) => {
+    question.type = Number(question.type);
     switch (question.type) {
       case 0:
         return (
@@ -141,7 +151,7 @@ const App = () => {
           <input
             type="number"
             min="1"
-            max="5"
+            max="10"
             value={difficultyLevel}
             onChange={(e) => setDifficultyLevel(e.target.value)}
             required
@@ -149,7 +159,7 @@ const App = () => {
         </div>
         <button type="submit" className="submit-button">Get Questions</button>
       </form>
-
+      {isLoading && <div className='spinner'></div>}
       {questions.length > 0 && (
         <div>
           <button onClick={() => handleSwipe('left')} className="nav-button">Previous</button>
