@@ -21,8 +21,15 @@ const HR = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post("/api/hr/addJob", formData);
-      alert("Job posted successfully!");
+      const response = await axios.post("http://localhost:4000/interview/job", formData);
+      alert(response.data.message);
+      setFormData({
+        jobTitle: "",
+        skills: "",
+        experience: "",
+        difficultyLevel: "",
+        programmingLanguage: "",
+      })
     } catch (error) {
       console.error("Error posting job", error);
     }

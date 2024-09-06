@@ -1,35 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import Editor from "@monaco-editor/react";
 import "./Candidate.css"; // Import the CSS file for styling
 import DoubtForum from "./DoubtForum";
-
-const JOBS = [
-  {
-    _id: "60d0fe4f5311236168a109ca",
-    jobTitle: "Software Engineer",
-    skills: "JavaScript, React, Node.js",
-    experience: "3",
-    difficultyLevel: "7",
-    programmingLanguage: "JavaScript",
-  },
-  {
-    _id: "60d0fe4f5311236168a109cb",
-    jobTitle: "Frontend Developer",
-    skills: "HTML, CSS, JavaScript",
-    experience: "2",
-    difficultyLevel: "5",
-    programmingLanguage: "JavaScript",
-  },
-  {
-    _id: "60d0fe4f5311236168a109cc",
-    jobTitle: "Backend Developer",
-    skills: "Node.js, Express, MongoDB",
-    experience: "4",
-    difficultyLevel: "8",
-    programmingLanguage: "JavaScript",
-  },
-];
+import { useNavigate } from "react-router-dom";
 
 const Candidate = () => {
   const [jobs, setJobs] = useState([]);
@@ -41,13 +15,15 @@ const Candidate = () => {
   const [currentAnswer, setEditorValue] = useState(""); // To store editor value
   const [language, setLanguage] = useState("javascript"); // Default language
   const [resetDoubtForum, setResetDoubtForum] = useState(false); // State to reset DoubtForum
+  const [currentInterviewId, setCurrentInterviewId] = useState(null);
+  const navigate = useNavigate();
+  const questionCardRef = useRef(null); // Ref for the question card
 
   useEffect(() => {
     const fetchJobs = async () => {
       try {
-        // const response = await axios.get("/api/candidate/getJobs");
-        // setJobs(response.data);
-        setJobs(JOBS);
+        const response = await axios.get("http://localhost:4000/interview/jobs");
+        setJobs(response.data.jobs);
       } catch (error) {
         console.error("Error fetching jobs", error);
       }
@@ -55,8 +31,19 @@ const Candidate = () => {
     fetchJobs();
   }, []);
 
+  useEffect(() => {
+    // Scroll to the question card when the currentQuestion changes
+    if (questionCardRef.current) {
+      questionCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [currentQuestion]);
+
   const handleJobSelect = async (job) => {
     try {
+      const newInterview = await axios.post("http://localhost:4000/interview/", {
+        jobID: job._id,
+      });
+      setCurrentInterviewId(newInterview.data.interviewID);
       setLoading(true);
       setSelectedJob(job);
       const response = await axios.post(
@@ -72,34 +59,46 @@ const Candidate = () => {
   };
 
   const handleAnswerChange = (value) => {
-    setEditorValue(value); // Update editor value
+    setEditorValue(value); // Update editor value for coding questions
   };
 
   const handleSubmit = async () => {
     const currentQuestionData = questions[currentQuestion];
-    const answer =
-      currentQuestionData.type === 2
-        ? currentAnswer
-        : answers[currentQuestion]?.answer;
+    let answer;
+
+    // Handle different types of questions
+    if (currentQuestionData.type === 2) {
+      answer = currentAnswer; // For coding questions, get the editor value
+    } else {
+      answer = currentAnswer || answers[currentQuestion]?.answer; // For text and multiple-choice
+    }
+
+    // Combine question and answer
+    const updatedQuestionWithAnswer = {
+      question: currentQuestionData.question,
+      answer: answer,
+    };
 
     const updatedAnswers = [
       ...answers,
-      { question: currentQuestionData, answer },
+      updatedQuestionWithAnswer,
     ];
-    setAnswers(updatedAnswers);
+
+    setAnswers(updatedAnswers); // Save the updated answers in the state
 
     try {
-      // await axios.post("/api/candidate/saveAnswer", {
-      //   jobId: selectedJob._id,
-      //   questionId: currentQuestionData.questionId,
-      //   answer,
-      // });
+      await axios.post("http://localhost:4000/interview/answer", {
+        interviewID: currentInterviewId,
+        questions: updatedAnswers
+      });
 
+      // If there are more questions, move to the next one
       if (currentQuestion < questions.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
-        setEditorValue(""); // Clear editor value
-        setResetDoubtForum(true); // Trigger reset for DoubtForum
+        setEditorValue(""); // Clear editor/input for the next question
+        setResetDoubtForum(true); // Reset the doubt forum
       } else {
+        // When all questions are done, submit the full set of answers
         submitAnswers(updatedAnswers);
       }
     } catch (error) {
@@ -109,11 +108,8 @@ const Candidate = () => {
 
   const submitAnswers = async (answers) => {
     try {
-      await axios.post("/api/candidate/submitAnswers", {
-        jobId: selectedJob._id,
-        answers,
-      });
       alert("Interview completed. Your answers have been submitted.");
+      navigate("/");
     } catch (error) {
       console.error("Error submitting answers", error);
     }
@@ -127,55 +123,66 @@ const Candidate = () => {
     switch (Number(question.type)) {
       case 0: // Text question
         return (
-          <div className="question-card">
-            <h3>{question.question}</h3>
-            <input
-              type="text"
-              onChange={(e) => handleAnswerChange(e.target.value)}
-              value={currentAnswer}
-            />
-            <button onClick={handleSubmit}>Submit</button>
-          </div>
+          <React.Fragment>
+            <div className="question-card" ref={questionCardRef}>
+              <h3>{question.question}</h3>
+              <input
+                type="text"
+                onChange={(e) => handleAnswerChange(e.target.value)}
+                value={currentAnswer}
+              />
+              <button onClick={handleSubmit}>Submit</button>
+            </div>
+            <DoubtForum reset={resetDoubtForum} question={questions[currentQuestion].question} />
+          </React.Fragment>
+
         );
       case 1: // Multiple choice question
         return (
-          <div className="question-card">
-            <h3>{question.question}</h3>
-            {question.options.map((option, index) => (
-              <div key={index}>
-                <input
-                  type="radio"
-                  id={`option-${index}`}
-                  name="multipleChoice"
-                  value={option}
-                  onClick={() => handleAnswerChange(option)}
-                />
-                <label htmlFor={`option-${index}`}>{option}</label>
-              </div>
-            ))}
-            <button onClick={handleSubmit}>Submit</button>
-          </div>
+          <React.Fragment>
+            <div className="question-card" ref={questionCardRef}>
+              <h3>{question.question}</h3>
+              {question.options.map((option, index) => (
+                <div key={index}>
+                  <input
+                    type="radio"
+                    id={`option-${index}`}
+                    name="multipleChoice"
+                    value={option}
+                    onClick={() => handleAnswerChange(option)}
+                  />
+                  <label htmlFor={`option-${index}`}>{option}</label>
+                </div>
+              ))}
+              <button onClick={handleSubmit}>Submit</button>
+            </div>
+            <DoubtForum reset={resetDoubtForum} question={questions[currentQuestion].question} />
+          </React.Fragment>
+
         );
       case 2: // Coding question
         return (
-          <div className="question-card">
-            <h3>{question.question}</h3>
-            <label htmlFor="language-select">Select Language: </label>
-            <select id="language-select" onChange={handleLanguageChange}>
-              <option value="javascript">JavaScript</option>
-              <option value="python">Python</option>
-              <option value="java">Java</option>
-              <option value="cpp">C++</option>
-              {/* Add more languages as needed */}
-            </select>
-            <Editor
-              height="60vh"
-              language={language}
-              defaultValue="// Write your code below"
-              onChange={handleAnswerChange}
-            />
-            <button onClick={handleSubmit}>Submit</button>
-          </div>
+          <React.Fragment>
+            <div className="question-card" ref={questionCardRef}>
+              <h3>{question.question}</h3>
+              <label htmlFor="language-select">Select Language: </label>
+              <select id="language-select" onChange={handleLanguageChange}>
+                <option value="javascript">JavaScript</option>
+                <option value="python">Python</option>
+                <option value="java">Java</option>
+                <option value="cpp">C++</option>
+                {/* Add more languages as needed */}
+              </select>
+              <Editor
+                height="60vh"
+                language={language}
+                defaultValue="// Write your code below"
+                onChange={handleAnswerChange}
+              />
+              <button onClick={handleSubmit}>Submit</button>
+            </div>
+            <DoubtForum reset={resetDoubtForum} question={questions[currentQuestion].question} />
+          </React.Fragment>
         );
       default:
         return <p>Unknown question type</p>;
@@ -206,8 +213,6 @@ const Candidate = () => {
           ) : questions.length > 0 ? (
             <div>
               {renderQuestion(questions[currentQuestion])}
-              <DoubtForum reset={resetDoubtForum} />{" "}
-              {/* Include DoubtForum below each question card */}
             </div>
           ) : (
             <p>No questions available.</p>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./DoubtForum.css";
 
-const DoubtForum = ({ reset }) => {
+const DoubtForum = ({ reset, question }) => {
   const [doubt, setDoubt] = useState("");
   const [chat, setChat] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -21,17 +21,19 @@ const DoubtForum = ({ reset }) => {
     setIsTyping(true); // Show typing animation
 
     try {
-      //   const response = await fetch("/api/ask-doubt", {
-      //     method: "POST",
-      //     headers: {
-      //       "Content-Type": "application/json",
-      //     },
-      //     body: JSON.stringify({ doubt }),
-      //   });
+      console.log({question});
+      const response = await fetch("http://localhost:4000/interview/doubt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ question, doubt, prevChat: chat }),
+      });
 
-      //   const data = await response.json();
+      const data = await response.json();
+      console.log({doubtResponse: data});
       setIsTyping(false); // Hide typing animation
-      setChat([...newChat, { sender: "assistant", message: "data.answer" }]);
+      setChat([...newChat, { sender: "assistant", message: data.message }]);
     } catch (error) {
       setIsTyping(false); // Hide typing animation
       console.error("Error fetching response:", error);
@@ -60,9 +62,8 @@ const DoubtForum = ({ reset }) => {
         {chat.map((chatItem, index) => (
           <div
             key={index}
-            className={`chat-bubble ${
-              chatItem.sender === "user" ? "user-message" : "assistant-message"
-            }`}
+            className={`chat-bubble ${chatItem.sender === "user" ? "user-message" : "assistant-message"
+              }`}
           >
             {chatItem.message}
           </div>

@@ -1,40 +1,5 @@
-// const { ai } = require("../resources/Openai")
-
-
-// module.exports = {
-//     generateQuestions: async (req, res, next) => {
-//         const { jobTitle, skills, experience, difficultyLevel } = req.body;
-//         try {
-//             const response = await ai.chat.completions.create({
-//                 model: 'gpt-4o',
-//                 messages: [
-//                     {
-//                         role: 'system',
-//                         content: 'You are an expert in creating job-specific exam questions.',
-//                     },
-//                     {
-//                         role: 'user',
-//                         content: `Generate 10 questions for a ${jobTitle} job interview with experience in years: ${experience} & difficulty level: ${difficultyLevel}/10. Include "question-and-answer", "multiple-choice", and "coding" questions. Skills required: ${skills}. Format each question as JSON with 'question', 'type', and optionally 'options' for multiple-choice questions, And send the response in a way that it can be passed in JSON.parse function directly
-//                         Your response should be an array of questions and no extra word, just the questions because if you will add any extra word, JSON.parse will give an error.
-//                         Also in JSON use type : 0, 1 and 2 where 0 means "question-answer", 1 means "multiple-choice" and 2 means "coding".`,
-//                     },
-//                 ],
-//                 temperature: 0.7,
-//                 n: 1,
-//             });
-
-//             // Format response to ensure it matches the required structure
-//             // console.log({ res: response.choices[0].message.content })
-//             const questions = JSON.parse(response.choices[0].message.content);
-//             // console.log(questions);
-//             res.status(200).json(questions);
-//         } catch (error) {
-//             next(error);
-//         }
-//     }
-// }
-
 const { ai } = require("../resources/Openai");
+const db = require("../models");
 
 module.exports = {
     generateQuestions: async (req, res, next) => {
@@ -89,6 +54,105 @@ module.exports = {
             res.status(200).json(questions);
         } catch (error) {
             next(error);
+        }
+    },
+    startAnInterview: async (req, res, next) => {
+        try {
+            const { jobID } = req.body;
+            const newInterview = new db.Interviews({
+                jobID: jobID
+            });
+            await newInterview.save();
+
+            return res.status(201).json({
+                message: "Interview has been created successfully!",
+                interviewID: newInterview._id
+            });
+        } catch (error) {
+            return next(error);
+        }
+    },
+    submitQuestion: async (req, res, next) => {
+        try {
+            const { interviewID, questions } = req.body;
+            const findInterview = await db.Interviews.findById(interviewID);
+            if (!findInterview) {
+                return res.status(404).json({
+                    message: "No such interview found!"
+                })
+            }
+
+            await db.Interviews.updateOne({
+                _id: interviewID
+            }, {
+                questions: questions
+            })
+
+
+            return res.status(200).json({
+                message: "Answer Submitted!"
+            });
+        } catch (error) {
+            return next(error);
+        }
+    },
+    askDoubt: async (req, res, next) => {
+        try {
+            const { doubt, prevChat, question } = req.body;
+
+            // Validate input data
+            if (!doubt || !prevChat || !Array.isArray(prevChat) || !question) {
+                return res.status(400).json({ error: "Invalid input data" });
+            }
+
+            // Format previous chat into a conversation history
+            const conversationHistory = prevChat
+                .map((entry) => `${entry.sender === "user" ? 'User' : 'Assistant'}: ${entry.message}`)
+                .join("\n");
+
+            // Call OpenAI API to generate a response using function call
+            const response = await ai.chat.completions.create({
+                model: "gpt-4",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are an AI assistant helping a candidate in a technical interview. 
+                    The candidate is asking for a hint about the question but do not give them the full solution. 
+                    Only provide guidance and hints.`,
+                    },
+                    {
+                        role: "user",
+                        content: `Interview Question: "${question}"\nCandidate Doubt: "${doubt}"\nPrevious Chat:\n${conversationHistory}`,
+                    },
+                ],
+                temperature: 0.7,
+                n: 1,
+                functions: [
+                    {
+                        name: "give_hint",
+                        description: "Give a hint to help the candidate solve the problem without fully providing the solution.",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                message: {
+                                    type: "string",
+                                    description: "A helpful hint message for the candidate.",
+                                },
+                            },
+                            required: ["message"],
+                        },
+                    },
+                ],
+                function_call: { name: "give_hint" },
+            });
+
+            // Extract the hint from the function call result
+            const hint = JSON.parse(response.choices[0].message.function_call.arguments).message;
+
+            // Return the hint in the required format
+            res.status(200).json({ message: hint });
+        } catch (error) {
+            return next(error);
         }
     }
 }

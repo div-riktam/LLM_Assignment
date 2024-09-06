@@ -1,7 +1,6 @@
 require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
-
 const app = express();
 
 app.use(express.json());
@@ -24,6 +23,9 @@ app.use((err, req, res, next) => {
     })
 });
 
-app.listen(process.env.PORT || 3000, () => {
+require("./resources/db");
+require("./models/JobOpening.model")
+app.listen(process.env.PORT || 3000, async () => {
+    // Mongoose
     console.log("Server has been started on PORT", process.env.PORT || 3000);
-})
+});
