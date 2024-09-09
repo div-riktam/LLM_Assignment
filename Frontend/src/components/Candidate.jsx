@@ -13,12 +13,15 @@ const Candidate = () => {
   const [answers, setAnswers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [currentAnswer, setEditorValue] = useState(""); // To store editor value
-  const [language, setLanguage] = useState("javascript"); // Default language
   const [resetDoubtForum, setResetDoubtForum] = useState(false); // State to reset DoubtForum
   const [currentInterviewId, setCurrentInterviewId] = useState(null);
   const navigate = useNavigate();
+  const [doubt, setDoubt] = useState("");
+  const [chat, setChat] = useState([]);
+  const [isTyping, setIsTyping] = useState(false);
   const questionCardRef = useRef(null); // Ref for the question card
 
+  // Fetch jobs once on component mount
   useEffect(() => {
     const fetchJobs = async () => {
       try {
@@ -31,13 +34,14 @@ const Candidate = () => {
     fetchJobs();
   }, []);
 
+  // Scroll to the question card when the currentQuestion changes
   useEffect(() => {
-    // Scroll to the question card when the currentQuestion changes
     if (questionCardRef.current) {
       questionCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [currentQuestion]);
 
+  // Handle job selection and fetching questions
   const handleJobSelect = async (job) => {
     try {
       const newInterview = await axios.post("http://localhost:4000/interview/", {
@@ -58,47 +62,40 @@ const Candidate = () => {
     }
   };
 
+  // Handle editor/input value changes
   const handleAnswerChange = (value) => {
-    setEditorValue(value); // Update editor value for coding questions
+    setEditorValue(value); // Update editor value for coding/text questions
   };
 
+  // Handle answer submission
   const handleSubmit = async () => {
     const currentQuestionData = questions[currentQuestion];
-    let answer;
+    const answer = currentAnswer || answers[currentQuestion]?.answer;
 
-    // Handle different types of questions
-    if (currentQuestionData.type === 2) {
-      answer = currentAnswer; // For coding questions, get the editor value
-    } else {
-      answer = currentAnswer || answers[currentQuestion]?.answer; // For text and multiple-choice
-    }
-
-    // Combine question and answer
     const updatedQuestionWithAnswer = {
       question: currentQuestionData.question,
       answer: answer,
     };
 
-    const updatedAnswers = [
-      ...answers,
-      updatedQuestionWithAnswer,
-    ];
-
-    setAnswers(updatedAnswers); // Save the updated answers in the state
+    const updatedAnswers = [...answers, updatedQuestionWithAnswer];
+    setAnswers(updatedAnswers);
 
     try {
+      const lastAnswer = updatedAnswers[updatedAnswers.length - 1];
+      lastAnswer.chat = chat;
+
       await axios.post("http://localhost:4000/interview/answer", {
         interviewID: currentInterviewId,
-        questions: updatedAnswers
+        questions: updatedAnswers,
+        chat,
       });
 
-      // If there are more questions, move to the next one
       if (currentQuestion < questions.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
-        setEditorValue(""); // Clear editor/input for the next question
-        setResetDoubtForum(true); // Reset the doubt forum
+        setEditorValue(""); // Clear input for next question
+        setResetDoubtForum(true); // Reset DoubtForum
+        setTimeout(() => setResetDoubtForum(false), 500); // Ensure reset is cleared
       } else {
-        // When all questions are done, submit the full set of answers
         submitAnswers(updatedAnswers);
       }
     } catch (error) {
@@ -115,74 +112,53 @@ const Candidate = () => {
     }
   };
 
-  const handleLanguageChange = (e) => {
-    setLanguage(e.target.value);
-  };
-
   const renderQuestion = (question) => {
     switch (Number(question.type)) {
       case 0: // Text question
         return (
-          <React.Fragment>
-            <div className="question-card" ref={questionCardRef}>
-              <h3>{question.question}</h3>
-              <input
-                type="text"
-                onChange={(e) => handleAnswerChange(e.target.value)}
-                value={currentAnswer}
-              />
-              <button onClick={handleSubmit}>Submit</button>
-            </div>
-            <DoubtForum reset={resetDoubtForum} question={questions[currentQuestion].question} />
-          </React.Fragment>
-
+          <div className="question-card" ref={questionCardRef}>
+            <h3>{question.question}</h3>
+            <input
+              type="text"
+              onChange={(e) => handleAnswerChange(e.target.value)}
+              value={currentAnswer}
+            />
+            <button onClick={handleSubmit}>Submit</button>
+          </div>
         );
       case 1: // Multiple choice question
         return (
-          <React.Fragment>
-            <div className="question-card" ref={questionCardRef}>
-              <h3>{question.question}</h3>
-              {question.options.map((option, index) => (
-                <div key={index}>
-                  <input
-                    type="radio"
-                    id={`option-${index}`}
-                    name="multipleChoice"
-                    value={option}
-                    onClick={() => handleAnswerChange(option)}
-                  />
-                  <label htmlFor={`option-${index}`}>{option}</label>
-                </div>
-              ))}
-              <button onClick={handleSubmit}>Submit</button>
-            </div>
-            <DoubtForum reset={resetDoubtForum} question={questions[currentQuestion].question} />
-          </React.Fragment>
-
+          <div className="question-card" ref={questionCardRef}>
+            <h3>{question.question}</h3>
+            {question.options.map((option, index) => (
+              <div key={index}>
+                <input
+                  type="radio"
+                  id={`option-${index}`}
+                  name="multipleChoice"
+                  value={option}
+                  onChange={() => handleAnswerChange(option)}
+                />
+                <label htmlFor={`option-${index}`}>{option}</label>
+              </div>
+            ))}
+            <button onClick={handleSubmit}>Submit</button>
+          </div>
         );
       case 2: // Coding question
         return (
-          <React.Fragment>
-            <div className="question-card" ref={questionCardRef}>
-              <h3>{question.question}</h3>
-              <label htmlFor="language-select">Select Language: </label>
-              <select id="language-select" onChange={handleLanguageChange}>
-                <option value="javascript">JavaScript</option>
-                <option value="python">Python</option>
-                <option value="java">Java</option>
-                <option value="cpp">C++</option>
-                {/* Add more languages as needed */}
-              </select>
+          <div className="question-card" ref={questionCardRef}>
+            <h3>{question.question}</h3>
+            <div className="editor-container">
               <Editor
-                height="60vh"
-                language={language}
-                defaultValue="// Write your code below"
+                height="100%" 
+                language={selectedJob.programmingLanguage}
+                defaultValue="// Write your code here"
                 onChange={handleAnswerChange}
               />
-              <button onClick={handleSubmit}>Submit</button>
             </div>
-            <DoubtForum reset={resetDoubtForum} question={questions[currentQuestion].question} />
-          </React.Fragment>
+            <button onClick={handleSubmit}>Submit</button>
+          </div>
         );
       default:
         return <p>Unknown question type</p>;
@@ -201,7 +177,7 @@ const Candidate = () => {
                 onClick={() => handleJobSelect(job)}
                 className="job-card"
               >
-                {job.jobTitle} with {job.experience} years of experience
+                {job.jobTitle} ({job.experience} years of experience)
               </li>
             ))}
           </ul>
@@ -213,6 +189,16 @@ const Candidate = () => {
           ) : questions.length > 0 ? (
             <div>
               {renderQuestion(questions[currentQuestion])}
+              <DoubtForum
+                doubt={doubt}
+                setDoubt={setDoubt}
+                setChat={setChat}
+                setIsTyping={setIsTyping}
+                chat={chat}
+                isTyping={isTyping}
+                reset={resetDoubtForum}
+                question={questions[currentQuestion].question}
+              />
             </div>
           ) : (
             <p>No questions available.</p>

@@ -7,7 +7,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 80vh;
+  min-height: 100vh; /* Adjusted to ensure full viewport height */
 }
 
 /* Container for the cards */
@@ -15,8 +15,10 @@ ul {
   list-style-type: none;
   padding: 0;
   display: flex;
-  justify-content: center;
+  flex-wrap: wrap; /* Allow wrapping if there are many cards */
   gap: 20px;
+  justify-content: center;
+  margin: 0;
 }
 
 /* Card styles */
@@ -48,4 +50,12 @@ li:hover {
 /* Link hover effect */
 .card-link:hover {
   color: #007bff;
+}
+
+.candidate-container {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }

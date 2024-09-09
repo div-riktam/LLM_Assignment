@@ -7,8 +7,7 @@ import Candidate from './components/Candidate';
 function App() {
   return (
     <Router>
-      <div>
-        <h1>Welcome to the Interview App</h1>
+      <div className="container">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/hr" element={<HR />} />

@@ -66,13 +66,26 @@ const HR = () => {
         value={formData.difficultyLevel}
         onChange={handleChange}
       />
-      <input
+      
+      <select
         className="form-input"
         name="programmingLanguage"
-        placeholder="Programming Language"
         value={formData.programmingLanguage}
         onChange={handleChange}
-      />
+      >
+        <option value="">Select Programming Language</option>
+        <option value="javascript">JavaScript</option>
+        <option value="typescript">TypeScript</option>
+        <option value="python">Python</option>
+        <option value="java">Java</option>
+        <option value="cpp">C++</option>
+        <option value="csharp">C#</option>
+        <option value="php">PHP</option>
+        <option value="go">Go</option>
+        <option value="ruby">Ruby</option>
+        <option value="sql">SQL</option>
+      </select>
+
       <button type="submit" className="form-button">
         Add Job
       </button>

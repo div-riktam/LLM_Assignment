@@ -10,6 +10,12 @@ const interviewSchema = new mongoose.Schema({
     {
       question: { type: String, required: true },
       answer: { type: String },
+      chat: [
+        {
+          sender: {type: String, required: true},
+          message: {type: String, required: true}
+        }
+      ]
     }
   ]
 });

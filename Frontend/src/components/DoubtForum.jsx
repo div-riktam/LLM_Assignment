@@ -1,27 +1,40 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import "./DoubtForum.css";
 
-const DoubtForum = ({ reset, question }) => {
-  const [doubt, setDoubt] = useState("");
-  const [chat, setChat] = useState([]);
-  const [isTyping, setIsTyping] = useState(false);
+const DoubtForum = ({
+  doubt,
+  setDoubt,
+  chat,
+  setChat,
+  isTyping,
+  setIsTyping,
+  reset,
+  question,
+}) => {
+  const chatWindowRef = useRef(null);
 
   useEffect(() => {
     if (reset) {
       setChat([]); // Clear chat history when reset is true
     }
-  }, [reset]);
+  }, [reset, setChat]);
+
+  useEffect(() => {
+    // Auto-scroll to the bottom when new messages are added
+    if (chatWindowRef.current) {
+      chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
+    }
+  }, [chat]);
 
   const handleDoubtSubmit = async () => {
     if (!doubt.trim()) return;
 
-    const newChat = [...chat, { sender: "user", message: doubt }];
-    setChat(newChat);
+    const newChat = { sender: "user", message: doubt };
+    setChat((prevChat) => [...prevChat, newChat]);
     setDoubt("");
     setIsTyping(true); // Show typing animation
 
     try {
-      console.log({question});
       const response = await fetch("http://localhost:4000/interview/doubt", {
         method: "POST",
         headers: {
@@ -31,14 +44,16 @@ const DoubtForum = ({ reset, question }) => {
       });
 
       const data = await response.json();
-      console.log({doubtResponse: data});
       setIsTyping(false); // Hide typing animation
-      setChat([...newChat, { sender: "assistant", message: data.message }]);
+      setChat((prevChat) => [
+        ...prevChat,
+        { sender: "assistant", message: data.message },
+      ]);
     } catch (error) {
       setIsTyping(false); // Hide typing animation
       console.error("Error fetching response:", error);
-      setChat([
-        ...newChat,
+      setChat((prevChat) => [
+        ...prevChat,
         { sender: "assistant", message: "Error fetching response" },
       ]);
     }
@@ -53,17 +68,23 @@ const DoubtForum = ({ reset, question }) => {
           value={doubt}
           onChange={(e) => setDoubt(e.target.value)}
           placeholder="Type your doubt here..."
+          disabled={isTyping} // Disable input while typing
         />
-        <button className="submit-doubt" onClick={handleDoubtSubmit}>
-          Ask
+        <button
+          className="submit-doubt"
+          onClick={handleDoubtSubmit}
+          disabled={isTyping} // Disable button while typing
+        >
+          {isTyping ? "Asking..." : "Ask"}
         </button>
       </div>
-      <div className="chat-window">
+      <div className="chat-window" ref={chatWindowRef}>
         {chat.map((chatItem, index) => (
           <div
             key={index}
-            className={`chat-bubble ${chatItem.sender === "user" ? "user-message" : "assistant-message"
-              }`}
+            className={`chat-bubble ${
+              chatItem.sender === "user" ? "user-message" : "assistant-message"
+            }`}
           >
             {chatItem.message}
           </div>

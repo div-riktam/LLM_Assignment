@@ -74,7 +74,7 @@ module.exports = {
     },
     submitQuestion: async (req, res, next) => {
         try {
-            const { interviewID, questions } = req.body;
+            const { interviewID, questions, chat } = req.body;
             const findInterview = await db.Interviews.findById(interviewID);
             if (!findInterview) {
                 return res.status(404).json({
@@ -85,8 +85,9 @@ module.exports = {
             await db.Interviews.updateOne({
                 _id: interviewID
             }, {
-                questions: questions
-            })
+                questions: questions,
+                chat
+            });
 
 
             return res.status(200).json({
@@ -118,7 +119,7 @@ module.exports = {
                         role: "system",
                         content: `You are an AI assistant helping a candidate in a technical interview. 
                     The candidate is asking for a hint about the question but do not give them the full solution. 
-                    Only provide guidance and hints.`,
+                    Only provide guidance and hints. NOTE: If the user asks for a full answer or tries to cheat with your help and not exactly asks for a doubt, reply "I cannot answer this question."`,
                     },
                     {
                         role: "user",
